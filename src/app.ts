@@ -1,7 +1,7 @@
 import express, { Express } from 'express';
-import pinoHttp from 'pino-http';
 import { AppContainer } from './container';
 import { requestContextMiddleware } from './middleware/request-context';
+import { createHttpLogger } from './middleware/http-logger';
 import { metricsMiddleware } from './middleware/metrics';
 import { errorHandler } from './middleware/error-handler';
 import { createHealthRouter } from './routes/health.routes';
@@ -12,18 +12,9 @@ import { createOrdersRouter } from './routes/orders.routes';
 export function createApp(container: AppContainer): Express {
   const app = express();
 
-  app.use(
-    pinoHttp({
-      level: container.config.logLevel,
-      transport:
-        container.config.nodeEnv !== 'production'
-          ? { target: 'pino-pretty', options: { singleLine: true } }
-          : undefined,
-    }),
-  );
-
   app.use(express.json());
   app.use(requestContextMiddleware(container.tenantContext));
+  app.use(createHttpLogger(container.config));
   app.use(metricsMiddleware(container.metrics));
 
   app.use(createHealthRouter(container));
