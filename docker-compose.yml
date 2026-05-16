@@ -1,13 +1,16 @@
 services:
   mysql:
     image: mysql:8.0
+    # Docker Desktop on Windows/WSL often lacks native AIO; this avoids noisy errors
+    command: --innodb-use-native-aio=0
     environment:
       MYSQL_ROOT_PASSWORD: root_secret
       MYSQL_DATABASE: flashsale
       MYSQL_USER: flashsale
       MYSQL_PASSWORD: flashsale_secret
     ports:
-      - "3306:3306"
+      # Host 3307 avoids conflict when local MySQL already uses 3306
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:

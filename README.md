@@ -14,7 +14,7 @@ Services:
 |---------|------|------|
 | API | 3000 | Fast HTTP layer — enqueue only |
 | Worker | — | Processes orders, stock deduction |
-| MySQL | 3306 | Source of truth |
+| MySQL | 3307 (host) → 3306 (container) | Source of truth |
 | Redis | 6379 | Idempotency, queue, cache |
 
 Migrations run automatically when the API container starts.
