@@ -30,13 +30,34 @@ export const openApiDocument = {
       },
     },
     schemas: {
-      Error: {
+      ApiError: {
         type: 'object',
-        required: ['code', 'message', 'request_id'],
+        required: ['success', 'request_id', 'error'],
         properties: {
-          code: { type: 'string', example: 'VALIDATION_ERROR' },
-          message: { type: 'string' },
-          request_id: { type: 'string', format: 'uuid' },
+          success: { type: 'boolean', enum: [false] },
+          request_id: { type: 'string' },
+          error: {
+            type: 'object',
+            required: ['code', 'message'],
+            properties: {
+              code: { type: 'string', example: 'VALIDATION_ERROR' },
+              message: { type: 'string' },
+            },
+          },
+        },
+      },
+      ApiSuccessEnvelope: {
+        type: 'object',
+        required: ['success', 'request_id', 'data'],
+        properties: {
+          success: { type: 'boolean', enum: [true] },
+          request_id: { type: 'string' },
+          data: {},
+          meta: {
+            type: 'object',
+            additionalProperties: true,
+            description: 'Optional metadata (e.g. next_cursor for lists)',
+          },
         },
       },
       HealthResponse: {
@@ -73,7 +94,6 @@ export const openApiDocument = {
           stock: { type: 'integer' },
           created_at: { type: 'string', format: 'date-time' },
           updated_at: { type: 'string', format: 'date-time' },
-          request_id: { type: 'string' },
         },
       },
       CreateCampaign: {
@@ -97,7 +117,6 @@ export const openApiDocument = {
           max_per_user: { type: 'integer', nullable: true },
           created_at: { type: 'string', format: 'date-time' },
           updated_at: { type: 'string', format: 'date-time' },
-          request_id: { type: 'string' },
         },
       },
       CreateOrder: {
@@ -143,14 +162,6 @@ export const openApiDocument = {
           request_id: { type: 'string' },
         },
       },
-      OrderList: {
-        type: 'object',
-        properties: {
-          data: { type: 'array', items: { $ref: '#/components/schemas/Order' } },
-          next_cursor: { type: 'string', nullable: true },
-          request_id: { type: 'string' },
-        },
-      },
     },
     parameters: {
       TenantId: {
@@ -167,10 +178,10 @@ export const openApiDocument = {
       },
     },
     responses: {
-      Error: {
-        description: 'Error response',
+      ApiError: {
+        description: 'Standard error envelope',
         content: {
-          'application/json': { schema: { $ref: '#/components/schemas/Error' } },
+          'application/json': { schema: { $ref: '#/components/schemas/ApiError' } },
         },
       },
     },
@@ -225,7 +236,7 @@ export const openApiDocument = {
               },
             },
           },
-          '400': { $ref: '#/components/responses/Error' },
+          '400': { $ref: '#/components/responses/ApiError' },
         },
       },
       post: {
@@ -250,8 +261,8 @@ export const openApiDocument = {
               },
             },
           },
-          '400': { $ref: '#/components/responses/Error' },
-          '409': { $ref: '#/components/responses/Error' },
+          '400': { $ref: '#/components/responses/ApiError' },
+          '409': { $ref: '#/components/responses/ApiError' },
         },
       },
     },
@@ -272,7 +283,7 @@ export const openApiDocument = {
               },
             },
           },
-          '404': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/ApiError' },
         },
       },
     },
@@ -322,8 +333,8 @@ export const openApiDocument = {
               },
             },
           },
-          '400': { $ref: '#/components/responses/Error' },
-          '404': { $ref: '#/components/responses/Error' },
+          '400': { $ref: '#/components/responses/ApiError' },
+          '404': { $ref: '#/components/responses/ApiError' },
         },
       },
     },
@@ -344,7 +355,7 @@ export const openApiDocument = {
               },
             },
           },
-          '404': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/ApiError' },
         },
       },
     },
@@ -402,8 +413,8 @@ export const openApiDocument = {
               },
             },
           },
-          '400': { $ref: '#/components/responses/Error' },
-          '409': { $ref: '#/components/responses/Error' },
+          '400': { $ref: '#/components/responses/ApiError' },
+          '409': { $ref: '#/components/responses/ApiError' },
         },
       },
     },
@@ -424,7 +435,7 @@ export const openApiDocument = {
               },
             },
           },
-          '404': { $ref: '#/components/responses/Error' },
+          '404': { $ref: '#/components/responses/ApiError' },
         },
       },
     },

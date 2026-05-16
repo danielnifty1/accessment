@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { HttpError } from '@/lib/errors';
+import { sendError } from '@/lib/api-response';
 import pino from 'pino';
 
 const logger = pino({ name: 'error-handler' });
@@ -10,21 +11,15 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  const requestId = req.requestId ?? 'unknown';
-
   if (err instanceof HttpError) {
-    res.status(err.status).json({
-      code: err.code,
-      message: err.message,
-      request_id: requestId,
-    });
+    sendError(res, req, err);
     return;
   }
 
-  logger.error({ err, requestId }, 'Unhandled exception');
-  res.status(500).json({
-    code: 'INTERNAL_ERROR',
-    message: 'An unexpected error occurred',
-    request_id: requestId,
-  });
+  logger.error({ err, requestId: req.requestId }, 'Unhandled exception');
+  sendError(
+    res,
+    req,
+    new HttpError(500, 'INTERNAL_ERROR', 'An unexpected error occurred'),
+  );
 }

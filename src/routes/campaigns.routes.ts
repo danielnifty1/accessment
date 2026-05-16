@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { AppContainer } from '@/container';
 import { asyncHandler } from '@/lib/async-handler';
+import { sendCreated, sendSuccess } from '@/lib/api-response';
 import { requireTenant } from '@/middleware/tenant';
 import { validateBody } from '@/middleware/validate';
 import { createCampaignSchema } from '@/schemas/campaign.schema';
 import { CampaignEntity } from '@/database/entities/campaign.entity';
 
-function toResponse(campaign: CampaignEntity) {
+function toDto(campaign: CampaignEntity) {
   return {
     id: campaign.id,
     tenant_id: campaign.tenantId,
@@ -21,7 +22,7 @@ function toResponse(campaign: CampaignEntity) {
 
 export function createCampaignsRouter(container: AppContainer): Router {
   const router = Router();
-  const { campaignsService, tenantContext } = container;
+  const { campaignsService } = container;
 
   router.use(requireTenant);
 
@@ -30,21 +31,15 @@ export function createCampaignsRouter(container: AppContainer): Router {
     validateBody(createCampaignSchema),
     asyncHandler(async (req, res) => {
       const campaign = await campaignsService.create(req.body);
-      res.status(201).json({
-        ...toResponse(campaign),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendCreated(res, req, toDto(campaign));
     }),
   );
 
   router.get(
     '/',
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
       const campaigns = await campaignsService.list();
-      res.json({
-        data: campaigns.map(toResponse),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendSuccess(res, req, campaigns.map(toDto));
     }),
   );
 
@@ -52,10 +47,7 @@ export function createCampaignsRouter(container: AppContainer): Router {
     '/:id',
     asyncHandler(async (req, res) => {
       const campaign = await campaignsService.findById(String(req.params.id));
-      res.json({
-        ...toResponse(campaign),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendSuccess(res, req, toDto(campaign));
     }),
   );
 

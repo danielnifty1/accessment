@@ -164,15 +164,37 @@ curl http://localhost:3000/orders/<order-id> -H "X-Tenant-Id: demo-tenant"
 
 ---
 
-## Error format
+## API response format
+
+All endpoints use a standard envelope from `src/lib/api-response.ts`.
+
+**Success:**
 
 ```json
 {
-  "code": "VALIDATION_ERROR",
-  "message": "...",
-  "request_id": "..."
+  "success": true,
+  "request_id": "uuid",
+  "data": { },
+  "meta": { "next_cursor": "..." }
 }
 ```
+
+`meta` is optional (e.g. cursor pagination on `GET /orders`).
+
+**Error:**
+
+```json
+{
+  "success": false,
+  "request_id": "uuid",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Human-readable message"
+  }
+}
+```
+
+Helpers: `sendSuccess`, `sendCreated`, `sendAccepted`, `sendError`, `buildSuccessBody`, `buildErrorBody`.
 
 ---
 

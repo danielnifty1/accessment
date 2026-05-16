@@ -1,6 +1,7 @@
 import { Router, Request } from 'express';
 import { AppContainer } from '@/container';
 import { asyncHandler } from '@/lib/async-handler';
+import { sendAccepted, sendSuccess } from '@/lib/api-response';
 import { requireTenant } from '@/middleware/tenant';
 import { validateBody, validateQuery } from '@/middleware/validate';
 import {
@@ -12,7 +13,7 @@ import { HEADER_IDEMPOTENCY_KEY } from '@/common/constants';
 import { badRequest } from '@/lib/errors';
 import { OrderEntity } from '@/database/entities/order.entity';
 
-function toResponse(order: OrderEntity) {
+function toDto(order: OrderEntity) {
   return {
     id: order.id,
     tenant_id: order.tenantId,
@@ -29,7 +30,7 @@ function toResponse(order: OrderEntity) {
 
 export function createOrdersRouter(container: AppContainer): Router {
   const router = Router();
-  const { ordersService, tenantContext } = container;
+  const { ordersService } = container;
 
   router.use(requireTenant);
 
@@ -50,7 +51,7 @@ export function createOrdersRouter(container: AppContainer): Router {
         req.body,
         idempotencyKey.trim(),
       );
-      res.status(202).json(result);
+      sendAccepted(res, req, result);
     }),
   );
 
@@ -61,10 +62,8 @@ export function createOrdersRouter(container: AppContainer): Router {
       const query = (req as Request & { validatedQuery: ListOrdersQuery })
         .validatedQuery;
       const result = await ordersService.listOrders(query);
-      res.json({
-        data: result.data.map(toResponse),
+      sendSuccess(res, req, result.data.map(toDto), 200, {
         next_cursor: result.next_cursor,
-        request_id: tenantContext.getRequestId(),
       });
     }),
   );
@@ -73,10 +72,7 @@ export function createOrdersRouter(container: AppContainer): Router {
     '/:id',
     asyncHandler(async (req, res) => {
       const order = await ordersService.getOrder(String(req.params.id));
-      res.json({
-        ...toResponse(order),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendSuccess(res, req, toDto(order));
     }),
   );
 

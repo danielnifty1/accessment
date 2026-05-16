@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { AppContainer } from '@/container';
 import { asyncHandler } from '@/lib/async-handler';
+import { sendCreated, sendSuccess } from '@/lib/api-response';
 import { requireTenant } from '@/middleware/tenant';
 import { validateBody } from '@/middleware/validate';
 import { createProductSchema } from '@/schemas/product.schema';
 import { ProductEntity } from '@/database/entities/product.entity';
 
-function toResponse(product: ProductEntity) {
+function toDto(product: ProductEntity) {
   return {
     id: product.id,
     tenant_id: product.tenantId,
@@ -21,7 +22,7 @@ function toResponse(product: ProductEntity) {
 
 export function createProductsRouter(container: AppContainer): Router {
   const router = Router();
-  const { productsService, tenantContext } = container;
+  const { productsService } = container;
 
   router.use(requireTenant);
 
@@ -30,21 +31,15 @@ export function createProductsRouter(container: AppContainer): Router {
     validateBody(createProductSchema),
     asyncHandler(async (req, res) => {
       const product = await productsService.create(req.body);
-      res.status(201).json({
-        ...toResponse(product),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendCreated(res, req, toDto(product));
     }),
   );
 
   router.get(
     '/',
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
       const products = await productsService.list();
-      res.json({
-        data: products.map(toResponse),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendSuccess(res, req, products.map(toDto));
     }),
   );
 
@@ -52,10 +47,7 @@ export function createProductsRouter(container: AppContainer): Router {
     '/:id',
     asyncHandler(async (req, res) => {
       const product = await productsService.findById(String(req.params.id));
-      res.json({
-        ...toResponse(product),
-        request_id: tenantContext.getRequestId(),
-      });
+      sendSuccess(res, req, toDto(product));
     }),
   );
 
