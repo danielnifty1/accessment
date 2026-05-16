@@ -42,7 +42,7 @@ docker-compose down
 | **OpenAPI JSON** | http://localhost:3000/api-docs/openapi.json | Raw spec |
 | **Worker** | (no HTTP port) | Processes orders, deducts stock |
 | **MySQL** | `localhost:3307` (host) | Database |
-| **Redis** | `localhost:6379` | Idempotency + queue |
+| **Redis** | `localhost:6380` (host) → 6379 (container) | Idempotency + queue |
 
 Migrations run automatically when the API container starts.
 
