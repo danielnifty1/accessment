@@ -17,6 +17,7 @@ async function bootstrap(): Promise<void> {
         env: nodeEnv,
         url: `http://localhost:${port}`,
         health: `http://localhost:${port}/health`,
+        swagger: `http://localhost:${port}/api-docs`,
       },
       `API listening on port ${port}`,
     );

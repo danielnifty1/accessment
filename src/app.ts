@@ -8,6 +8,7 @@ import { createHealthRouter } from './routes/health.routes';
 import { createProductsRouter } from './routes/products.routes';
 import { createCampaignsRouter } from './routes/campaigns.routes';
 import { createOrdersRouter } from './routes/orders.routes';
+import { setupSwagger } from './swagger/setup';
 
 export function createApp(container: AppContainer): Express {
   const app = express();
@@ -16,6 +17,8 @@ export function createApp(container: AppContainer): Express {
   app.use(requestContextMiddleware(container.tenantContext));
   app.use(createHttpLogger(container.config));
   app.use(metricsMiddleware(container.metrics));
+
+  setupSwagger(app, container.config.port);
 
   app.use(createHealthRouter(container));
   app.use('/products', createProductsRouter(container));

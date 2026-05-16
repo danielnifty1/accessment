@@ -1,41 +1,99 @@
 # Flash Sale Inventory & Orders
 
-Production-grade multi-tenant flash sale system built with **Node.js**, **Express**, **TypeORM**, **MySQL**, **Redis**, and **BullMQ**. Designed for 10,000+ concurrent purchase attempts with overselling prevention, Redis idempotency, and async order processing.
+Production-grade multi-tenant flash sale system built with **Node.js**, **Express**, **TypeORM**, **MySQL**, **Redis**, and **BullMQ**.
 
-## Quick start (Docker)
+## Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (recommended), **or**
+- Node.js 20+, MySQL 8, Redis 7
+
+---
+
+## Run with Docker (recommended)
+
+### Start all services and watch logs
 
 ```bash
+cd c:\Users\user\accessment
 docker-compose up --build
 ```
 
-Services:
+Keep this terminal open. You will see logs from **api**, **worker**, **mysql**, and **redis**. Every HTTP request is logged on the **api** service (method, URL, status, `request_id`, `tenant_id`).
 
-| Service | Port | Role |
-|---------|------|------|
-| API | 3000 | Fast HTTP layer — enqueue only |
-| Worker | — | Processes orders, stock deduction |
-| MySQL | 3307 (host) → 3306 (container) | Source of truth |
-| Redis | 6379 | Idempotency, queue, cache |
+### Start in background, follow API logs only
+
+```bash
+docker-compose up --build -d
+docker-compose logs -f api
+```
+
+### Stop
+
+```bash
+docker-compose down
+```
+
+### Services and ports
+
+| Service | URL / port | Role |
+|---------|------------|------|
+| **API** | http://localhost:3000 | HTTP + Swagger |
+| **Swagger UI** | http://localhost:3000/api-docs | Interactive API docs |
+| **OpenAPI JSON** | http://localhost:3000/api-docs/openapi.json | Raw spec |
+| **Worker** | (no HTTP port) | Processes orders, deducts stock |
+| **MySQL** | `localhost:3307` (host) | Database |
+| **Redis** | `localhost:6379` | Idempotency + queue |
 
 Migrations run automatically when the API container starts.
 
-### Health & metrics
+### Verify
 
 ```bash
 curl http://localhost:3000/health
-curl http://localhost:3000/metrics
 ```
 
-## Local development (without Docker)
+Expected: `"status":"ok"` with `database` and `redis` true.
 
-1. Start MySQL 8 and Redis 7 locally.
-2. Copy environment file:
+---
+
+## Swagger / OpenAPI
+
+With the API running, open:
+
+**http://localhost:3000/api-docs**
+
+1. Click **Authorize** (optional) — set `X-Tenant-Id` to e.g. `demo-tenant`.
+2. Try **GET /health** (no tenant header required).
+3. Create flow: **POST /products** → **POST /campaigns** → **POST /orders** (add `Idempotency-Key` header on orders).
+4. Poll **GET /orders** or **GET /orders/{id}** until status is `CONFIRMED` or `REJECTED` (worker must be running).
+
+For **POST /orders**, use header:
+
+```
+Idempotency-Key: order-attempt-001
+```
+
+Tenant-scoped routes require:
+
+```
+X-Tenant-Id: demo-tenant
+```
+
+Import into Postman: **Import** → `http://localhost:3000/api-docs/openapi.json`
+
+---
+
+## Run locally (without Docker)
+
+### 1. Environment
 
 ```bash
 cp .env.example .env
 ```
 
-3. Install and migrate:
+Edit `.env` if MySQL/Redis are not on `localhost` (defaults: MySQL `3306`, Redis `6379`).
+
+### 2. Install, build, migrate
 
 ```bash
 npm install
@@ -43,33 +101,31 @@ npm run build
 node dist/database/run-migrations.js
 ```
 
-4. Run API and worker in separate terminals:
+### 3. Start API and worker (two terminals)
+
+**Terminal 1 — API:**
 
 ```bash
 npm run start:dev
+```
+
+**Terminal 2 — worker (required for order processing):**
+
+```bash
 npm run start:worker:dev
 ```
 
-API and worker are separate Node processes (no NestJS):
+Startup log includes `port`, `url`, `health`, and `swagger` URLs.
 
-```
-src/main.ts    → Express HTTP API
-src/worker.ts  → BullMQ consumer
-```
+### 4. Open Swagger
 
-## API usage
+http://localhost:3000/api-docs
 
-All tenant-scoped routes require:
+---
 
-```
-X-Tenant-Id: <tenant-id>
-```
+## API usage (curl)
 
-Order placement also requires:
-
-```
-Idempotency-Key: <unique-key-per-logical-request>
-```
+All tenant routes need `X-Tenant-Id`. Orders also need `Idempotency-Key`.
 
 ### Create product
 
@@ -77,7 +133,7 @@ Idempotency-Key: <unique-key-per-logical-request>
 curl -X POST http://localhost:3000/products \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: demo-tenant" \
-  -d '{"sku":"FLASH-001","name":"Sneakers","price":"99.99","stock":50}'
+  -d "{\"sku\":\"FLASH-001\",\"name\":\"Sneakers\",\"price\":\"99.99\",\"stock\":50}"
 ```
 
 ### Create campaign
@@ -86,51 +142,27 @@ curl -X POST http://localhost:3000/products \
 curl -X POST http://localhost:3000/campaigns \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: demo-tenant" \
-  -d '{
-    "product_id": "<product-uuid>",
-    "start_time": "2026-05-16T00:00:00.000Z",
-    "end_time": "2026-05-17T00:00:00.000Z",
-    "max_per_user": 2
-  }'
+  -d "{\"product_id\":\"<product-uuid>\",\"start_time\":\"2026-01-01T00:00:00.000Z\",\"end_time\":\"2027-12-31T23:59:59.000Z\",\"max_per_user\":2}"
 ```
 
-### Place order (async)
+### Place order (async, returns PENDING)
 
 ```bash
 curl -X POST http://localhost:3000/orders \
   -H "Content-Type: application/json" \
   -H "X-Tenant-Id: demo-tenant" \
   -H "Idempotency-Key: order-attempt-001" \
-  -d '{
-    "campaign_id": "<campaign-uuid>",
-    "product_id": "<product-uuid>",
-    "user_id": "user-42",
-    "quantity": 1
-  }'
+  -d "{\"campaign_id\":\"<campaign-uuid>\",\"product_id\":\"<product-uuid>\",\"user_id\":\"user-42\",\"quantity\":1}"
 ```
 
-Immediate response:
-
-```json
-{
-  "request_id": "...",
-  "status": "PENDING"
-}
-```
-
-Poll order status:
+### List / get orders
 
 ```bash
-curl http://localhost:3000/orders/<order-id> \
-  -H "X-Tenant-Id: demo-tenant"
+curl "http://localhost:3000/orders?limit=20" -H "X-Tenant-Id: demo-tenant"
+curl http://localhost:3000/orders/<order-id> -H "X-Tenant-Id: demo-tenant"
 ```
 
-### List orders (cursor pagination)
-
-```bash
-curl "http://localhost:3000/orders?status=CONFIRMED&limit=20" \
-  -H "X-Tenant-Id: demo-tenant"
-```
+---
 
 ## Error format
 
@@ -142,6 +174,8 @@ curl "http://localhost:3000/orders?status=CONFIRMED&limit=20" \
 }
 ```
 
+---
+
 ## Testing
 
 ```bash
@@ -149,7 +183,9 @@ npm test
 npm run test:integration
 ```
 
-Integration tests require MySQL and Redis (e.g. via `docker-compose up mysql redis`).
+Integration tests need MySQL and Redis (e.g. `docker-compose up -d mysql redis`).
+
+---
 
 ## Project structure
 
@@ -158,10 +194,11 @@ src/
   main.ts, worker.ts, app.ts, container.ts
   routes/             # Express routers
   services/           # Business logic
-  middleware/         # tenant, validation, errors, metrics
+  middleware/         # tenant, validation, logging, errors
+  swagger/            # OpenAPI spec + Swagger UI
   database/           # TypeORM entities, migrations
-  schemas/            # Zod request validation
-  queue/              # Job types
+  schemas/            # Zod validation
+  queue/              # BullMQ job types
 ```
 
 See [ARCHITECTURE.md](./ARCHITECTURE.md) for concurrency design and scaling notes.
