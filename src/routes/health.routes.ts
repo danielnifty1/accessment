@@ -1,13 +1,14 @@
 import { Router } from 'express';
 import { AppContainer } from '@/container';
 import { asyncHandler } from '@/lib/async-handler';
+import { sendSuccess } from '@/lib/api-response';
 
 export function createHealthRouter(container: AppContainer): Router {
   const router = Router();
 
   router.get(
     '/health',
-    asyncHandler(async (_req, res) => {
+    asyncHandler(async (req, res) => {
       let dbOk = false;
       let redisOk = false;
 
@@ -25,15 +26,15 @@ export function createHealthRouter(container: AppContainer): Router {
         redisOk = false;
       }
 
-      res.json({
+      sendSuccess(res, req, {
         status: dbOk && redisOk ? 'ok' : 'degraded',
         checks: { database: dbOk, redis: redisOk },
       });
     }),
   );
 
-  router.get('/metrics', (_req, res) => {
-    res.json(container.metrics.getSnapshot());
+  router.get('/metrics', (req, res) => {
+    sendSuccess(res, req, container.metrics.getSnapshot());
   });
 
   return router;
