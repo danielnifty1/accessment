@@ -1,0 +1,86 @@
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secret
+      MYSQL_DATABASE: flashsale
+      MYSQL_USER: flashsale
+      MYSQL_PASSWORD: flashsale_secret
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "flashsale", "-pflashsale_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: flashsale
+      DB_PASSWORD: flashsale_secret
+      DB_DATABASE: flashsale
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      IDEMPOTENCY_TTL_SECONDS: 86400
+      BULLMQ_ORDER_QUEUE: orders
+      LOG_LEVEL: info
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: sh -c "node dist/database/run-migrations.js && node dist/main.js"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  worker:
+    build: .
+    environment:
+      NODE_ENV: production
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USERNAME: flashsale
+      DB_PASSWORD: flashsale_secret
+      DB_DATABASE: flashsale
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      IDEMPOTENCY_TTL_SECONDS: 86400
+      BULLMQ_ORDER_QUEUE: orders
+      LOG_LEVEL: info
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    command: node dist/worker.js
+    deploy:
+      replicas: 1
+
+volumes:
+  mysql_data:
